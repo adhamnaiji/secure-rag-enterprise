@@ -1,0 +1,69 @@
+# Core RAG & LLM
+langchain>=0.3.0
+langchain-community>=0.3.0
+langchain-openai>=0.2.0
+openai>=1.50.0
+anthropic>=0.7.0
+ollama>=0.0.11
+huggingface-hub>=0.17.0
+
+# Vector Databases
+faiss-cpu>=1.7.4
+pinecone-client>=3.0.0
+pymilvus>=2.3.0
+
+# Security & Encryption
+cryptography>=41.0.0
+pycryptodome>=3.18.0
+python-dotenv>=1.0.0
+
+# Data Processing & Validation
+pypdf>=3.17.0
+python-multipart>=0.0.6
+pydantic>=2.5.0
+pydantic-settings>=2.0.0
+
+# Security Testing
+bandit>=1.7.5
+safety>=2.3.5
+
+# Compliance & Audit
+python-json-logger>=2.0.7
+
+# Adversarial Testing
+textattack>=0.3.10
+adversarial-robustness-toolbox>=1.20.0
+
+# Fairness & Bias
+fairlearn>=0.10.0
+aif360>=0.5.0
+
+# Energy Monitoring
+codecarbon>=2.3.5
+
+# API & Web
+fastapi>=0.104.0
+uvicorn>=0.24.0
+starlette>=0.27.0
+
+# Dashboard
+streamlit>=1.51.0
+plotly>=5.17.0
+
+# Monitoring & Logging
+prometheus-client>=0.18.0
+structlog>=23.2.0
+
+# Database
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.9
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.21.0
+
+# Utilities
+tqdm>=4.66.0
+numpy>=1.26.0
+pandas>=2.1.0

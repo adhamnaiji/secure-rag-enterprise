@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+.env
+.vscode/
+*.log
+data/raw/
+models/checkpoints/
+.pytest_cache/
+*.pkl
+embeddings/
+results/
