@@ -31,7 +31,6 @@ safety>=2.3.5
 python-json-logger>=2.0.7
 
 # Adversarial Testing
-textattack>=0.3.10
 adversarial-robustness-toolbox>=1.20.0
 
 # Fairness & Bias
@@ -52,7 +51,6 @@ plotly>=5.17.0
 
 # Monitoring & Logging
 prometheus-client>=0.18.0
-structlog>=23.2.0
 
 # Database
 sqlalchemy>=2.0.0
