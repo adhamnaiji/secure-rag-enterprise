@@ -1,4 +1,128 @@
-from fastapi import FastAPI, HTTPException, Header, UploadFile, File
+import os
+
+# Dictionary of files to create/update
+files_to_create = {
+    'src/core/llm_handler.py': '''from langchain_perplexity import ChatPerplexity
+from langchain_core.messages import HumanMessage
+from config.settings import settings
+from typing import List
+import logging
+
+logger = logging.getLogger(__name__)
+
+class PerplexityLLM:
+    """Handle Perplexity LLM integration"""
+    
+    def __init__(self):
+        try:
+            self.llm = ChatPerplexity(
+                api_key=settings.PERPLEXITY_API_KEY,
+                model=settings.PERPLEXITY_MODEL,
+                temperature=settings.LLM_TEMPERATURE,
+                max_tokens=settings.LLM_MAX_TOKENS
+            )
+            logger.info("Perplexity LLM initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize Perplexity LLM: {e}")
+            self.llm = None
+    
+    def generate_response(self, query: str, context: List[str] = None) -> str:
+        """Generate response using Perplexity"""
+        try:
+            if not self.llm:
+                return "LLM not initialized. Check API key."
+            
+            context = context or []
+            context_str = "\\n".join(context) if context else "No context available"
+            
+            prompt = f"""Based on the following context, answer the user's query:
+
+Context:
+{context_str}
+
+Query: {query}
+
+Answer:"""
+            
+            message = HumanMessage(content=prompt)
+            response = self.llm.invoke([message])
+            return response.content
+        except Exception as e:
+            logger.error(f"Error generating response: {e}")
+            return f"Error: {str(e)}"
+''',
+
+    'src/core/vector_store_handler.py': '''from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from typing import List, Dict, Optional
+import logging
+
+logger = logging.getLogger(__name__)
+
+class VectorStoreHandler:
+    """Handle vector store operations"""
+    
+    def __init__(self):
+        try:
+            self.embeddings = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-miniLM-L6-v2"
+            )
+            self.vector_store = None
+            logger.info("Vector store initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize embeddings: {e}")
+            self.embeddings = None
+    
+    def create_from_documents(self, documents: List[Dict]) -> bool:
+        """Create vector store from documents"""
+        try:
+            if not self.embeddings:
+                logger.error("Embeddings not available")
+                return False
+            
+            texts = [doc.get('content', '') for doc in documents]
+            metadatas = [
+                {
+                    'source': doc.get('source', 'unknown'),
+                    'chunk_index': doc.get('chunk_index', 0),
+                    'timestamp': doc.get('timestamp', '')
+                }
+                for doc in documents
+            ]
+            
+            self.vector_store = FAISS.from_texts(
+                texts=texts,
+                embedding=self.embeddings,
+                metadatas=metadatas
+            )
+            logger.info(f"Vector store created with {len(documents)} documents")
+            return True
+        except Exception as e:
+            logger.error(f"Error creating vector store: {e}")
+            return False
+    
+    def search(self, query: str, k: int = 5) -> List[Dict]:
+        """Search vector store"""
+        try:
+            if not self.vector_store:
+                logger.warning("Vector store is empty")
+                return []
+            
+            results = self.vector_store.similarity_search_with_score(query, k=k)
+            return [
+                {
+                    'content': doc.page_content,
+                    'metadata': doc.metadata,
+                    'score': float(score)
+                }
+                for doc, score in results
+            ]
+        except Exception as e:
+            logger.error(f"Error searching vector store: {e}")
+            return []
+''',
+
+    'src/api/main.py': '''from fastapi import FastAPI, HTTPException, Header, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import time
@@ -161,3 +285,36 @@ async def get_metrics():
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=settings.BACKEND_PORT, reload=True)
+'''
+}
+
+def main():
+    """Create all files"""
+    print("=" * 60)
+    print("🚀 Secure RAG System - Auto Fixer")
+    print("=" * 60)
+    
+    for filepath, content in files_to_create.items():
+        # Create directory if needed
+        directory = os.path.dirname(filepath)
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory, exist_ok=True)
+            print(f"📁 Created directory: {directory}")
+        
+        # Write file
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(content)
+        
+        print(f"✅ Created: {filepath}")
+    
+    print("\n" + "=" * 60)
+    print("✅ ALL FILES CREATED SUCCESSFULLY!")
+    print("=" * 60)
+    print("\n📋 Next Steps:")
+    print("1. Stop current API (Ctrl+C)")
+    print("2. Run: uvicorn src.api.main:app --reload")
+    print("3. Test: http://localhost:8000/docs")
+    print("\n🎉 Your Secure RAG System with Perplexity is ready!")
+
+if __name__ == "__main__":
+    main()

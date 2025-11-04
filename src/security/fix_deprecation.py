@@ -1,4 +1,6 @@
 import os
+
+fixed_content = '''import os
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 import jwt
@@ -32,3 +34,11 @@ class AccessController:
             return None
         except jwt.InvalidTokenError:
             return None
+'''
+
+with open('src/security/access_control.py', 'w', encoding='utf-8') as f:
+    f.write(fixed_content)
+
+print('✅ Fixed: src/security/access_control.py')
+print('✅ Removed datetime.utcnow() deprecation warnings')
+print('✅ Python 3.14+ compatible')
