@@ -13,7 +13,7 @@ API_TOKEN = "test-token"
 HEADERS = {"Authorization": f"Bearer {API_TOKEN}"}
 
 st.title("🔐 Secure Enterprise RAG System")
-st.subheader("Powered by Perplexity LLM + HuggingFace Embeddings")
+st.subheader("Luxembourg Institute of Science and Technology (LIST)")
 
 # ===== SIDEBAR =====
 st.sidebar.header("⚙️ Configuration")
