@@ -1,32 +1,41 @@
-# src/rag/document_processor.py
+# src/rag/document_processor.py - PERPLEXITY OPTIMIZED
 import os
 import re
 from typing import List, Dict, Optional
-from langchain.embeddings import OpenAIEmbeddings
 from datetime import datetime
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from typing import List
+from langchain_community.embeddings import HuggingFaceEmbeddings
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class SecureDocumentProcessor:
-    """Process financial documents securely for RAG"""
+    """Process documents securely for RAG with Perplexity integration"""
     
-    def __init__(self, embedding_model: str = "text-embedding-3-small"):
+    def __init__(self, embedding_model: str = "sentence-transformers/all-miniLM-L6-v2"):
+        """
+        Initialize document processor
+        
+        Args:
+            embedding_model: HuggingFace embedding model (FREE - no API key needed)
+        """
         try:
-            self.embeddings = OpenAIEmbeddings(model=embedding_model)
-        except Exception as e:
-            print(f"⚠️ Warning: OpenAI embeddings not available. Using local embeddings.")
-            # Fallback to local embeddings
-            from langchain.embeddings import HuggingFaceEmbeddings
+            # Use local HuggingFace embeddings (NO OpenAI dependency)
             self.embeddings = HuggingFaceEmbeddings(
-                model_name="sentence-transformers/all-miniLM-L6-v2"
+                model_name=embedding_model
             )
+            logger.info(f"✅ Embeddings initialized: {embedding_model}")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize embeddings: {e}")
+            raise
         
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=500,
-            chunk_overlap=50,
-            separators=["\n\n", "\n", " "]
+            chunk_size=1000,
+            chunk_overlap=200,
+            separators=["\n\n", "\n", " ", ""]
         )
         self.vector_store = None
         self.processing_log = []
@@ -42,16 +51,16 @@ class SecureDocumentProcessor:
         Returns:
             List of processed documents
         """
-        print(f"📂 Loading documents from: {folder_path}")
+        logger.info(f"📂 Loading documents from: {folder_path}")
         
         if not os.path.exists(folder_path):
-            print(f"❌ Folder not found: {folder_path}")
+            logger.error(f"❌ Folder not found: {folder_path}")
             return []
         
         documents = []
         files = os.listdir(folder_path)
         
-        print(f"📋 Found {len(files)} files")
+        logger.info(f"📋 Found {len(files)} files")
         
         for file_name in files:
             file_path = os.path.join(folder_path, file_name)
@@ -60,7 +69,7 @@ class SecureDocumentProcessor:
                 continue
             
             try:
-                print(f"⏳ Processing: {file_name}...", end=" ")
+                logger.info(f"⏳ Processing: {file_name}...")
                 
                 # Load based on file type
                 if file_name.endswith('.pdf'):
@@ -68,11 +77,11 @@ class SecureDocumentProcessor:
                     docs = loader.load()
                 
                 elif file_name.endswith('.txt'):
-                    loader = TextLoader(file_path)
+                    loader = TextLoader(file_path, encoding='utf-8')
                     docs = loader.load()
                 
                 else:
-                    print("⏭️ SKIPPED (unsupported format)")
+                    logger.warning(f"⏭️  SKIPPED: {file_name} (unsupported format)")
                     continue
                 
                 # Process each document
@@ -95,10 +104,10 @@ class SecureDocumentProcessor:
                     'timestamp': datetime.now().isoformat()
                 })
                 
-                print(f"✅ SUCCESS ({len(docs)} chunks)")
+                logger.info(f"✅ SUCCESS: {file_name} ({len(docs)} chunks)")
                 
             except Exception as e:
-                print(f"❌ ERROR: {str(e)}")
+                logger.error(f"❌ ERROR processing {file_name}: {str(e)}")
                 self.processing_log.append({
                     'file': file_name,
                     'status': 'error',
@@ -106,22 +115,40 @@ class SecureDocumentProcessor:
                     'timestamp': datetime.now().isoformat()
                 })
         
-        print(f"\n📊 Total documents loaded: {len(documents)}")
+        logger.info(f"📊 Total documents loaded: {len(documents)}")
         self.documents_loaded = documents
         return documents
     
     def _sanitize_content(self, content: str) -> str:
         """Remove sensitive patterns from content"""
+        
         # Mask credit card numbers
-        content = re.sub(r'\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}', 
-                        '[MASKED_CARD]', content)
+        content = re.sub(
+            r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b',
+            '[MASKED_CC]',
+            content
+        )
         
         # Mask SSN
-        content = re.sub(r'\d{3}-\d{2}-\d{4}', '[MASKED_SSN]', content)
+        content = re.sub(
+            r'\b\d{3}-\d{2}-\d{4}\b',
+            '[MASKED_SSN]',
+            content
+        )
         
-        # Mask email addresses
-        content = re.sub(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}',
-                        '[MASKED_EMAIL]', content)
+        # Mask emails
+        content = re.sub(
+            r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b',
+            '[MASKED_EMAIL]',
+            content
+        )
+        
+        # Mask phone numbers
+        content = re.sub(
+            r'\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b',
+            '[MASKED_PHONE]',
+            content
+        )
         
         return content
     
@@ -133,22 +160,22 @@ class SecureDocumentProcessor:
             documents: Processed documents
             
         Returns:
-            FAISS vector store or None if empty
+            FAISS vector store or None if error
         """
         if not documents:
-            print("❌ ERROR: No documents provided to create vector store")
+            logger.error("❌ No documents provided")
             return None
         
-        print(f"\n🔄 Creating vector store from {len(documents)} documents...")
+        logger.info(f"🔄 Creating vector store from {len(documents)} documents...")
         
-        # Extract content from documents
+        # Extract content
         texts = [doc['content'] for doc in documents]
         
         # Split into chunks
         all_chunks = []
         all_metadata = []
         
-        print(f"✂️ Splitting documents into chunks...")
+        logger.info("✂️  Splitting documents into chunks...")
         for i, text in enumerate(texts):
             chunks = self.text_splitter.split_text(text)
             all_chunks.extend(chunks)
@@ -161,29 +188,29 @@ class SecureDocumentProcessor:
                     'loaded_at': documents[i].get('loaded_at', '')
                 })
         
-        print(f"📦 Total chunks created: {len(all_chunks)}")
+        logger.info(f"📦 Total chunks: {len(all_chunks)}")
         
         if not all_chunks:
-            print("❌ ERROR: No chunks created. Vector store is empty.")
+            logger.error("❌ No chunks created")
             return None
         
         try:
-            print(f"🧠 Generating embeddings for {len(all_chunks)} chunks...")
+            logger.info(f"🧠 Generating embeddings for {len(all_chunks)} chunks...")
             
-            # Create vector store
+            # Create vector store (uses HuggingFace embeddings - FREE!)
             self.vector_store = FAISS.from_texts(
                 texts=all_chunks,
                 embedding=self.embeddings,
                 metadatas=all_metadata
             )
             
-            print(f"✅ Vector store created successfully!")
-            print(f"📊 Vector store contains {len(all_chunks)} indexed chunks")
+            logger.info(f"✅ Vector store created successfully!")
+            logger.info(f"📊 {len(all_chunks)} chunks indexed")
             
             return self.vector_store
         
         except Exception as e:
-            print(f"❌ ERROR creating vector store: {str(e)}")
+            logger.error(f"❌ Error creating vector store: {str(e)}")
             return None
     
     def retrieve_similar_documents(self, query: str, k: int = 5) -> List[Dict]:
@@ -198,16 +225,16 @@ class SecureDocumentProcessor:
             List of relevant documents
         """
         if self.vector_store is None:
-            print("❌ Vector store is empty. Please load documents first.")
+            logger.warning("❌ Vector store is empty")
             return []
         
-        print(f"\n🔍 Searching for: '{query}'")
+        logger.info(f"🔍 Searching: '{query}'")
         
         try:
             results = self.vector_store.similarity_search_with_score(query, k=k)
             
             if not results:
-                print("❌ No results found")
+                logger.warning("⚠️  No results found")
                 return []
             
             retrieved_docs = []
@@ -219,30 +246,39 @@ class SecureDocumentProcessor:
                     'source': doc.metadata.get('source', 'unknown'),
                     'page': doc.metadata.get('page', 0)
                 })
-                print(f"  {i+1}. {doc.metadata.get('source')} (Score: {score:.3f})")
+                logger.info(f"  {i+1}. {doc.metadata.get('source')} (Score: {score:.3f})")
             
             return retrieved_docs
         
         except Exception as e:
-            print(f"❌ ERROR during retrieval: {str(e)}")
+            logger.error(f"❌ Error during retrieval: {str(e)}")
             return []
     
-    def save_vector_store(self, path: str = "data/vectors"):
+    def save_vector_store(self, path: str = "data/vectors") -> bool:
         """Save vector store to disk"""
         if self.vector_store is None:
-            print("❌ Vector store is empty. Cannot save.")
-            return
+            logger.error("❌ Vector store is empty")
+            return False
         
-        os.makedirs(path, exist_ok=True)
-        self.vector_store.save_local(path)
-        print(f"✅ Vector store saved to {path}")
+        try:
+            os.makedirs(path, exist_ok=True)
+            self.vector_store.save_local(path)
+            logger.info(f"✅ Vector store saved to {path}")
+            return True
+        except Exception as e:
+            logger.error(f"❌ Error saving vector store: {e}")
+            return False
     
-    def load_vector_store(self, path: str = "data/vectors"):
+    def load_vector_store(self, path: str = "data/vectors") -> Optional[FAISS]:
         """Load vector store from disk"""
         if not os.path.exists(path):
-            print(f"❌ Vector store not found at {path}")
+            logger.error(f"❌ Vector store not found at {path}")
             return None
         
-        self.vector_store = FAISS.load_local(path, self.embeddings)
-        print(f"✅ Vector store loaded from {path}")
-        return self.vector_store
+        try:
+            self.vector_store = FAISS.load_local(path, self.embeddings)
+            logger.info(f"✅ Vector store loaded from {path}")
+            return self.vector_store
+        except Exception as e:
+            logger.error(f"❌ Error loading vector store: {e}")
+            return None

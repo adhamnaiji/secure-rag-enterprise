@@ -1,4 +1,4 @@
-from core.document_processor import SecureDocumentProcessor
+from rag.document_processor import SecureDocumentProcessor
 
 
 def test_document_processing():
